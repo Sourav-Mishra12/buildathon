@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AI Assistive Reader</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --primary: #4f46e5;
+      --text: #111827;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 40px auto;
+      padding: 0 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.05);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .section {
+      margin-top: 28px;
+    }
+
+    .section-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    input[type="file"],
+    input[type="text"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font-size: 14px;
+      outline: none;
+      margin-top: 6px;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 120px;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      border-color: var(--primary);
+    }
+
+    button {
+      margin-top: 12px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 12px 18px;
+      border-radius: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .status {
+      margin-top: 12px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .divider {
+      margin: 32px 0;
+      border-top: 1px dashed var(--border);
+    }
+
+    footer {
+      margin-top: 40px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="card">
+
+    <h1>AI Assistive Reader</h1>
+    <p class="subtitle">
+      Upload a document, get a simple explanation, and ask questions about it.
+    </p>
+
+    <!-- STEP 1 -->
+    <div class="section">
+      <div class="section-title">Step 1: Upload Document</div>
+      <input type="file" id="fileInput" accept="image/*">
+      <button id="uploadBtn" onclick="uploadDoc()">Upload & Process</button>
+      <div class="status" id="statusText"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- STEP 2 -->
+    <div class="section">
+      <div class="section-title">Step 2: Simplified Summary</div>
+      <textarea id="summaryBox" placeholder="Summary will appear here..." readonly></textarea>
+    </div>
+
+    <!-- TTS CONTROLS (ADDED ONLY THIS PART) -->
+    <div class="section">
+      <div class="section-title">Listen to Summary</div>
+
+      <select id="ttsLang">
+        <option value="en-US">English</option>
+        <option value="hi-IN">Hindi</option>
+      </select>
+
+      <select id="ttsSpeed">
+        <option value="0.75">0.75x</option>
+        <option value="1" selected>1x</option>
+        <option value="1.5">1.5x</option>
+        <option value="2">2x</option>
+      </select>
+
+      <button onclick="speakSummary()">🔊 Read Summary</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- STEP 3 -->
+    <div class="section">
+      <div class="section-title">Step 3: Ask a Question</div>
+      <input type="text" id="questionInput" placeholder="Ask something about the document...">
+      <button onclick="askQuestion()">Ask Question</button>
+    </div>
+
+    <!-- ANSWER -->
+    <div class="section">
+      <div class="section-title">Answer</div>
+      <textarea id="answerBox" placeholder="Answer will appear here..." readonly></textarea>
+    </div>
+
+  </div>
+
+  <footer>
+    AI Assistive Reader • Hackathon Build
+  </footer>
+</div>
+
+<script>
+  const API_BASE = "http://127.0.0.1:8000";
+
+  let extractedText = "";
+  let summaryText = "";
+
+  function setStatus(msg) {
+    document.getElementById("statusText").innerText = msg;
+  }
+
+  function disableUpload(disabled) {
+    document.getElementById("uploadBtn").disabled = disabled;
+  }
+
+  async function uploadDoc() {
+    const file = document.getElementById("fileInput").files[0];
+    if (!file) {
+      alert("Please select a document image");
+      return;
+    }
+
+    disableUpload(true);
+    setStatus("Uploading document...");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const uploadRes = await fetch(API_BASE + "/upload", {
+        method: "POST",
+        body: formData
+      });
+
+      const uploadData = await uploadRes.json();
+      extractedText = uploadData.extracted_text;
+
+      setStatus("Generating simplified summary...");
+
+      const summaryRes = await fetch(API_BASE + "/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: extractedText,
+          language: document.getElementById("ttsLang").value === "hi-IN"
+          ? "Hindi"
+          : "English"
+        })
+      });
+
+      const summaryData = await summaryRes.json();
+      summaryText = summaryData.summary;
+
+      document.getElementById("summaryBox").value = summaryText;
+      setStatus("Done ✅");
+
+      document.getElementById("summaryBox")
+        .scrollIntoView({ behavior: "smooth" });
+
+    } catch (err) {
+      setStatus("Something went wrong. Please try again.");
+    }
+
+    disableUpload(false);
+  }
+
+  async function askQuestion() {
+    const question = document.getElementById("questionInput").value;
+    if (!question) {
+      alert("Please enter a question");
+      return;
+    }
+
+    setStatus("Finding answer...");
+
+    try {
+      const res = await fetch(API_BASE + "/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          summary: summaryText,
+          question: question,
+          language: document.getElementById("ttsLang").value === "hi-IN"
+          ? "Hindi"
+          : "English"
+        })
+      });
+
+      const data = await res.json();
+      document.getElementById("answerBox").value = data.answer;
+
+      setStatus("Answer ready ✅");
+
+      document.getElementById("answerBox")
+        .scrollIntoView({ behavior: "smooth" });
+
+    } catch (err) {
+      setStatus("Could not fetch answer. Try again.");
+    }
+  }
+
+  /* ===== TTS FUNCTION (ONLY ADDITION IN JS) ===== */
+async function speakSummary() {
+  if (!summaryText) {
+    alert("Summary is empty");
+    return;
+  }
+
+  const lang = document.getElementById("ttsLang").value;
+  const speed = parseFloat(document.getElementById("ttsSpeed").value);
+
+  window.speechSynthesis.cancel();
+
+  // 🔹 English: direct speak
+  if (lang === "en-US") {
+    const utterance = new SpeechSynthesisUtterance(summaryText);
+    utterance.lang = "en-US";
+    utterance.rate = speed;
+    window.speechSynthesis.speak(utterance);
+    return;
+  }
+
+  // 🔹 Hindi: translate first, then speak
+  try {
+    setStatus("Translating to Hindi for audio...");
+
+    const res = await fetch(API_BASE + "/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        summary: summaryText,
+        question:
+          "Translate the above text into simple Hindi. Use ONLY Hindi language. Do not use English.",
+        language: "Hindi"
+      })
+    });
+
+    const data = await res.json();
+    let hindiText = data.answer;
+
+    if (!hindiText) {
+      setStatus("Hindi translation failed");
+      return;
+    }
+
+    // 🔹 Clean markdown/symbols before TTS
+    const cleanText = hindiText
+      .replace(/\*\*/g, "")
+      .replace(/\*/g, "")
+      .replace(/[-•]/g, "");
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = "hi-IN";
+    utterance.rate = speed;
+
+    window.speechSynthesis.speak(utterance);
+    setStatus("Playing Hindi audio ✅");
+
+  } catch (err) {
+    setStatus("Hindi audio failed");
+  }
+}
+
+
+</script>
+
+</body>
+</html>
