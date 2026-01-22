@@ -34,3 +34,32 @@ Built as a hackathon MVP with a focus on accessibility and clarity.
 ```bash
 cd backend
 uvicorn app:app --reload
+
+2. Open Frontend
+
+Open this file in browser:
+
+frontend/index.html
+
+
+(No build step required)
+
+🧪 Demo Flow
+
+Upload a document image
+
+View simplified English summary
+
+Ask a question about the document
+
+Listen to the summary in English or Hindi
+
+🧠 Notes
+
+The project uses a local LLM for privacy, zero cost, and offline demos.
+
+Architecture is model-agnostic and can switch to hosted APIs if needed.
+
+👤 Author
+
+Built for hackathon submission.
